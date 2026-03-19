@@ -31,10 +31,9 @@ export const useAuthStore = create((set, get) => ({
         set({ isSigningUp: true });
         try {
             const res = await axiosInstance.post("/auth/signup", data);
+            localStorage.setItem("jwt", res.data.token); // ← save token
             set({ authUser: res.data });
-
             toast.success("Account created successfully!");
-
             get().connectSocket();
         } catch (error) {
             toast.error(error.response.data.message);
@@ -47,11 +46,10 @@ export const useAuthStore = create((set, get) => ({
         set({ isLoggingIn: true });
         try {
             const res = await axiosInstance.post("/auth/login", data);
+            localStorage.setItem("jwt", res.data.token); // ← save token
             set({ authUser: res.data });
-
             toast.success("Logged in successfully");
-
-            get().connectSocket(); 
+            get().connectSocket();
         } catch (error) {
             toast.error(error.response.data.message);
         } finally {
@@ -61,13 +59,14 @@ export const useAuthStore = create((set, get) => ({
 
     logout: async () => {
         try {
-            await axiosInstance.post("auth/logout");
+            await axiosInstance.post("/auth/logout");
+            localStorage.removeItem("jwt"); // ← clear token
             set({ authUser: null });
             toast.success("Logged out successfully");
             get().disconnectSocket();
         } catch (error) {
             toast.error("Error logging out");
-            console.log("Logout error:",error);
+            console.log("Logout error:", error);
         }
     },
 
@@ -84,17 +83,17 @@ export const useAuthStore = create((set, get) => ({
 
     connectSocket: () => {
         const { authUser } = get();
-        if(!authUser || get().socket?.connected) return;
+        if (!authUser || get().socket?.connected) return;
+
+        const token = localStorage.getItem("jwt"); // ← get token
 
         const socket = io(BASE_URL, {
-            withCredentials: true, // this ensures cookies are sent with the connection
+            auth: { token }, // ← send token with socket
         });
 
         socket.connect();
-
         set({ socket });
 
-        // listen for online users event
         socket.on("getOnlineUsers", (userIds) => {
             set({ onlineUsers: userIds });
         });
